@@ -245,7 +245,8 @@ const SEED = [
   {id:"diz",group:"Внутренняя",name:"Дизайн",budget:1050000,paid:150000,status:"progress",pct:14},
   {id:"svai",group:"Коробка",name:"Сваи",month:"июнь",budget:745000,paid:745000,status:"done",pct:100},
   {id:"rost",group:"Коробка",name:"Ростверк",month:"июнь",budget:2200000,paid:2200000,status:"progress",pct:50},
-  {id:"pol1",group:"Коробка",name:"Пол (плита)",budget:700000,paid:0,status:"funded",pct:0},
+  {id:"comm",group:"Коробка",name:"Коммуникации",budget:200000,paid:0,status:"funded",pct:0},
+  {id:"pol1",group:"Коробка",name:"Пол",budget:1000000,paid:0,status:"funded",pct:0},
   {id:"sten",group:"Коробка",name:"Стены (1 + 2 этаж)",month:"июль",budget:4000000,paid:0,status:"todo",pct:0},
   {id:"krov",group:"Коробка",name:"Кровля",month:"сентябрь",budget:3000000,paid:0,status:"todo",pct:0},
   {id:"okna",group:"Коробка",name:"Окна",month:"октябрь",budget:2000000,paid:0,status:"todo",pct:0},
@@ -453,10 +454,30 @@ function tgInit(){
   // длинный скролл не должен случайно закрывать окно
   try{TG.disableVerticalSwipes&&TG.disableVerticalSwipes();}catch(e){}
 }
+/* Правки Юли применяем и к уже сохранённым данным: сохранённое состояние
+   полностью перекрывает SEED, поэтому изменений в SEED одних мало.
+   Функция идемпотентна — повторный запуск ничего не ломает. */
+function migrate(){
+  let changed=false;
+  const pol=state.find(s=>s.id==="pol1");
+  if(pol){
+    if(pol.name==="Пол (плита)"){pol.name="Пол"; changed=true;}
+    if(pol.budget===700000){pol.budget=1000000; changed=true;}
+  }
+  if(!state.some(s=>s.id==="comm")){
+    const item={id:"comm",group:"Коробка",name:"Коммуникации",budget:200000,paid:0,status:"funded",pct:0};
+    const i=state.findIndex(s=>s.id==="pol1");
+    state.splice(i<0?state.length:i,0,item); // ставим прямо перед «Полом»
+    changed=true;
+  }
+  return changed;
+}
+
 async function init(){
   tgInit();
   const r=await store.get(KEY);
   if(r&&r.value){try{state=JSON.parse(r.value)}catch(e){}}
+  if(migrate()) save();
   buildOverview();buildRail();buildDonut();buildTimeline();buildGroups();
   requestAnimationFrame(()=>requestAnimationFrame(applyState));
 }
