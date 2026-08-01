@@ -247,7 +247,10 @@ const SEED = [
   {id:"rost",group:"Коробка",name:"Ростверк",month:"июнь",budget:2200000,paid:2200000,status:"progress",pct:50},
   {id:"comm",group:"Коробка",name:"Коммуникации",budget:200000,paid:0,status:"funded",pct:0},
   {id:"pol1",group:"Коробка",name:"Пол",budget:1000000,paid:0,status:"funded",pct:0},
-  {id:"sten",group:"Коробка",name:"Стены (1 + 2 этаж)",month:"июль",budget:4000000,paid:0,status:"todo",pct:0},
+  {id:"sten",group:"Коробка",name:"Стены: блоки 1 и 2 этаж",month:"июль",budget:1500000,paid:0,status:"todo",pct:0},
+  {id:"sten_per",group:"Коробка",name:"Стены: перемычки",budget:300000,paid:0,status:"todo",pct:0},
+  {id:"sten_pli",group:"Коробка",name:"Стены: плиты",budget:1088000,paid:0,status:"todo",pct:0},
+  {id:"sten_rab",group:"Коробка",name:"Стены: работа и мелочи",budget:2000000,paid:0,status:"todo",pct:0},
   {id:"krov",group:"Коробка",name:"Кровля",month:"сентябрь",budget:3000000,paid:0,status:"todo",pct:0},
   {id:"okna",group:"Коробка",name:"Окна",month:"октябрь",budget:2000000,paid:0,status:"todo",pct:0},
   {id:"inzh",group:"Коробка",name:"Сантехника + электрика",month:"сентябрь",budget:3500000,paid:0,status:"todo",pct:0},
@@ -468,6 +471,19 @@ function migrate(){
     const item={id:"comm",group:"Коробка",name:"Коммуникации",budget:200000,paid:0,status:"funded",pct:0};
     const i=state.findIndex(s=>s.id==="pol1");
     state.splice(i<0?state.length:i,0,item); // ставим прямо перед «Полом»
+    changed=true;
+  }
+  /* 01.08.2026: «Стены (1 + 2 этаж)» на 4 млн Юля разделила на 4 этапа.
+     Старую карточку превращаем в «блоки», три остальные вставляем следом;
+     статус и прогресс переносим на «блоки», деньги — тоже (их всё равно 0). */
+  const st=state.find(s=>s.id==="sten");
+  if(st&&!state.some(s=>s.id==="sten_per")){
+    st.name="Стены: блоки 1 и 2 этаж"; st.budget=1500000; st.month="июль";
+    const i=state.indexOf(st);
+    state.splice(i+1,0,
+      {id:"sten_per",group:"Коробка",name:"Стены: перемычки",budget:300000,paid:0,status:st.status,pct:0},
+      {id:"sten_pli",group:"Коробка",name:"Стены: плиты",budget:1088000,paid:0,status:st.status,pct:0},
+      {id:"sten_rab",group:"Коробка",name:"Стены: работа и мелочи",budget:2000000,paid:0,status:st.status,pct:0});
     changed=true;
   }
   return changed;
