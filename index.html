@@ -247,10 +247,14 @@ const SEED = [
   {id:"rost",group:"Коробка",name:"Ростверк",month:"июнь",budget:2200000,paid:2200000,status:"progress",pct:50},
   {id:"comm",group:"Коробка",name:"Коммуникации",budget:200000,paid:0,status:"funded",pct:0},
   {id:"pol1",group:"Коробка",name:"Пол",budget:1000000,paid:0,status:"funded",pct:0},
-  {id:"sten",group:"Коробка",name:"Стены: блоки 1 и 2 этаж",month:"июль",budget:1500000,paid:0,status:"todo",pct:0},
-  {id:"sten_per",group:"Коробка",name:"Стены: перемычки",budget:300000,paid:0,status:"todo",pct:0},
-  {id:"sten_pli",group:"Коробка",name:"Стены: плиты",budget:1088000,paid:0,status:"todo",pct:0},
-  {id:"sten_rab",group:"Коробка",name:"Стены: работа и мелочи",budget:2000000,paid:0,status:"todo",pct:0},
+  {id:"vokrug",group:"Коробка",name:"Вокруг дома",budget:500000,paid:0,status:"todo",pct:0},
+  {id:"sten",group:"Коробка",name:"Стены: блоки 1 и 2 этаж",month:"июль",budget:1430000,paid:0,status:"todo",pct:0},
+  {id:"sten_per",group:"Коробка",name:"Стены: перемычки",budget:310000,paid:0,status:"todo",pct:0},
+  {id:"sten_pli",group:"Коробка",name:"Стены: плиты",budget:1065000,paid:0,status:"todo",pct:0},
+  {id:"armo",group:"Коробка",name:"Армопояс",budget:400000,paid:0,status:"todo",pct:0},
+  {id:"sten_rab",group:"Коробка",name:"Стены: работа",budget:1500000,paid:0,status:"todo",pct:0},
+  {id:"lestn",group:"Коробка",name:"Лестницы",budget:300000,paid:0,status:"todo",pct:0},
+  {id:"sten_mel",group:"Коробка",name:"Стены: мелочи",budget:250000,paid:0,status:"todo",pct:0},
   {id:"krov",group:"Коробка",name:"Кровля",month:"сентябрь",budget:3000000,paid:0,status:"todo",pct:0},
   {id:"okna",group:"Коробка",name:"Окна",month:"октябрь",budget:2000000,paid:0,status:"todo",pct:0},
   {id:"inzh",group:"Коробка",name:"Сантехника + электрика",month:"сентябрь",budget:3500000,paid:0,status:"todo",pct:0},
@@ -278,21 +282,41 @@ const KEY="nash-dom-v1";
 const mln=n=>(n/1e6).toLocaleString("ru-RU",{maximumFractionDigits:1})+" млн";
 const full=n=>n.toLocaleString("ru-RU")+" ₽";
 const TG=window.Telegram&&window.Telegram.WebApp;
+/* У Telegram CloudStorage лимит 4096 БАЙТ на ключ, а состояние уже ~4,4 КБ
+   (кириллица = 2 байта). Целиком setItem молча падает — тогда данные живут
+   только в localStorage и не синкаются между устройствами. Поэтому пишем
+   частями по 1300 символов в ключи <KEY>_0..N плюс счётчик <KEY>_n. */
+const CHUNK=1300;
+const cloud=TG&&TG.CloudStorage&&TG.CloudStorage.getItem?TG.CloudStorage:null;
+const cget=k=>new Promise(res=>{try{cloud.getItem(k,(e,v)=>res(e?null:v))}catch(_){res(null)}});
+let queue=Promise.resolve();
+const cset=(k,v)=>new Promise(res=>{try{cloud.setItem(k,v,(e)=>res(!e))}catch(_){res(false)}});
 const store={
   async get(k){
     // 1) Telegram CloudStorage — синхронизируется между устройствами
-    if(TG&&TG.CloudStorage&&TG.CloudStorage.getItem){
-      const v=await new Promise(res=>{try{TG.CloudStorage.getItem(k,(e,val)=>res(e?null:val))}catch(_){res(null)}});
-      if(v) return {value:v};
+    if(cloud){
+      const n=parseInt(await cget(k+"_n"),10);
+      if(n>0){
+        const parts=await Promise.all(Array.from({length:n},(_,i)=>cget(k+"_"+i)));
+        if(parts.every(p=>p!==null&&p!==undefined&&p!=="")) return {value:parts.join("")};
+      }
+      const legacy=await cget(k); // версии до чанкования
+      if(legacy) return {value:legacy};
     }
     // 2) запасной вариант — локально в браузере
     try{const v=localStorage.getItem(k); return v?{value:v}:null}catch(e){return null}
   },
   async set(k,v){
-    if(TG&&TG.CloudStorage&&TG.CloudStorage.setItem){
-      try{TG.CloudStorage.setItem(k,v,()=>{})}catch(_){}
-    }
     try{localStorage.setItem(k,v)}catch(e){}
+    if(!cloud) return;
+    // сохранения идут по очереди, иначе два подряд перемешают куски в облаке
+    queue=queue.then(async()=>{
+      const parts=[]; for(let i=0;i<v.length;i+=CHUNK) parts.push(v.slice(i,i+CHUNK));
+      for(let i=0;i<parts.length;i++) await cset(k+"_"+i,parts[i]);
+      await cset(k+"_n",String(parts.length));
+      try{cloud.removeItem&&cloud.removeItem(k,()=>{})}catch(_){} // старый цельный ключ больше не нужен
+    }).catch(()=>{});
+    return queue;
   }
 };
 let state=SEED.map(s=>({...s}));
@@ -486,6 +510,25 @@ function migrate(){
       {id:"sten_rab",group:"Коробка",name:"Стены: работа и мелочи",budget:2000000,paid:0,status:st.status,pct:0});
     changed=true;
   }
+  /* 14.08.2026: Юля прислала уточнённую смету по стенам и новые пункты.
+     Суммы правим у существующих карточек, «работа и мелочи» распадается
+     на «работа» (1,5 млн) и «мелочи» (250 тыс.), плюс три новых пункта. */
+  const set=(id,patch)=>{const s=state.find(x=>x.id===id); if(!s) return;
+    for(const k in patch){ if(s[k]!==patch[k]){s[k]=patch[k]; changed=true;} }};
+  set("sten",{budget:1430000});
+  set("sten_per",{budget:310000});
+  set("sten_pli",{budget:1065000});
+  set("sten_rab",{name:"Стены: работа",budget:1500000});
+  const add=(item,afterId)=>{
+    if(state.some(s=>s.id===item.id)) return;
+    const i=state.findIndex(s=>s.id===afterId);
+    state.splice(i<0?state.length:i+1,0,item);
+    changed=true;
+  };
+  add({id:"vokrug",group:"Коробка",name:"Вокруг дома",budget:500000,paid:0,status:"todo",pct:0},"pol1");
+  add({id:"armo",group:"Коробка",name:"Армопояс",budget:400000,paid:0,status:"todo",pct:0},"sten_pli");
+  add({id:"lestn",group:"Коробка",name:"Лестницы",budget:300000,paid:0,status:"todo",pct:0},"sten_rab");
+  add({id:"sten_mel",group:"Коробка",name:"Стены: мелочи",budget:250000,paid:0,status:"todo",pct:0},"lestn");
   return changed;
 }
 
