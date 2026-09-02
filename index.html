@@ -462,7 +462,7 @@ function applyState(){
       :(s.paid>=s.budget&&s.budget>0)?`<span class="paid">оплачено · </span>`:"";
     card.querySelector(".bud").innerHTML=paidTxt+full(s.budget);
   });
-  document.getElementById("stagesMeta").textContent=state.length+" позиций · "+mln(m.tb)+" ₽";
+  document.getElementById("stagesMeta").textContent=state.length+" позиций · "+mln(m.tb)+" ₽ · v19";
 }
 /* 02.09.2026, просьба Юли: статус «готово» = этап оплачен целиком.
    Раньше статус и деньги жили отдельно, и «оплачено» не росло, хотя этапы
@@ -574,13 +574,23 @@ function migrate(){
   return changed;
 }
 
+/* Рисуем СРАЗУ, до похода в хранилище: если облако тормозит или колбэк не пришёл,
+   экран всё равно с цифрами, а не с прочерками. Когда данные приедут — перерисуем.
+   Все builder'ы пишут через innerHTML, повторный вызов ничего не дублирует. */
+function draw(){
+  buildOverview();buildRail();buildDonut();buildTimeline();buildGroups();
+  const paint=()=>{try{applyState()}catch(e){}};
+  paint();                                    // без ожидания кадра — webview его иногда не даёт
+  requestAnimationFrame(()=>requestAnimationFrame(paint));
+  setTimeout(paint,300);
+}
 async function init(){
   tgInit();
-  const r=await store.get(KEY);
+  draw();
+  let r=null; try{r=await store.get(KEY)}catch(e){}
   if(r&&r.value){try{state=JSON.parse(r.value)}catch(e){}}
-  if(migrate()) save();
-  buildOverview();buildRail();buildDonut();buildTimeline();buildGroups();
-  requestAnimationFrame(()=>requestAnimationFrame(applyState));
+  try{if(migrate()) save()}catch(e){}
+  draw();
 }
 init();
 </script>
