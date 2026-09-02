@@ -246,18 +246,18 @@ const SEED = [
   {id:"svai",group:"Коробка",name:"Сваи",month:"июнь",budget:745000,paid:745000,status:"done",pct:100},
   {id:"rost",group:"Коробка",name:"Ростверк",month:"июнь",budget:2200000,paid:2200000,status:"progress",pct:50},
   {id:"comm",group:"Коробка",name:"Коммуникации",budget:200000,paid:0,status:"funded",pct:0},
-  {id:"pol1",group:"Коробка",name:"Пол",budget:1000000,paid:0,status:"funded",pct:0},
+  {id:"pol1",group:"Коробка",name:"Пол",budget:1300000,paid:0,status:"funded",pct:0},
   {id:"vokrug",group:"Коробка",name:"Вокруг дома",budget:500000,paid:0,status:"todo",pct:0},
   {id:"sten",group:"Коробка",name:"Стены: блоки 1 и 2 этаж",month:"июль",budget:1430000,paid:0,status:"todo",pct:0},
   {id:"sten_per",group:"Коробка",name:"Стены: перемычки",budget:310000,paid:0,status:"todo",pct:0},
   {id:"sten_pli",group:"Коробка",name:"Стены: плиты",budget:1065000,paid:0,status:"todo",pct:0},
-  {id:"armo",group:"Коробка",name:"Армопояс",budget:400000,paid:0,status:"todo",pct:0},
-  {id:"sten_rab",group:"Коробка",name:"Стены: работа",budget:1500000,paid:0,status:"todo",pct:0},
-  {id:"lestn",group:"Коробка",name:"Лестницы",budget:300000,paid:0,status:"todo",pct:0},
-  {id:"sten_mel",group:"Коробка",name:"Стены: мелочи",budget:250000,paid:0,status:"todo",pct:0},
+  {id:"armo",group:"Коробка",name:"Армопояс",budget:516000,paid:0,status:"todo",pct:0},
+  {id:"sten_rab",group:"Коробка",name:"Стены: работа (кладка)",budget:2202000,paid:0,status:"todo",pct:0},
+  {id:"lestn",group:"Коробка",name:"Лестницы",budget:120000,paid:0,status:"todo",pct:0},
+  {id:"sten_mel",group:"Коробка",name:"Стены: мелочи",budget:751000,paid:0,status:"todo",pct:0},
   {id:"krov",group:"Коробка",name:"Кровля",month:"сентябрь",budget:3000000,paid:0,status:"todo",pct:0},
   {id:"okna",group:"Коробка",name:"Окна",month:"октябрь",budget:2000000,paid:0,status:"todo",pct:0},
-  {id:"inzh",group:"Коробка",name:"Сантехника + электрика",month:"сентябрь",budget:3500000,paid:0,status:"todo",pct:0},
+  {id:"inzh",group:"Внутренняя",name:"Сантехника + электрика",month:"сентябрь",budget:3500000,paid:0,status:"todo",pct:0},
   {id:"styazh",group:"Внутренняя",name:"Стяжка пола",budget:660000,paid:0,status:"todo",pct:0},
   {id:"shtuk",group:"Внутренняя",name:"Штукатурка",budget:1200000,paid:0,status:"todo",pct:0},
   {id:"chist",group:"Внутренняя",name:"Чистовая отделка",budget:5000000,paid:0,status:"todo",pct:0},
@@ -518,7 +518,7 @@ function migrate(){
   set("sten",{budget:1430000});
   set("sten_per",{budget:310000});
   set("sten_pli",{budget:1065000});
-  set("sten_rab",{name:"Стены: работа",budget:1500000});
+  set("sten_rab",{name:"Стены: работа"});
   const add=(item,afterId)=>{
     if(state.some(s=>s.id===item.id)) return;
     const i=state.findIndex(s=>s.id===afterId);
@@ -529,6 +529,15 @@ function migrate(){
   add({id:"armo",group:"Коробка",name:"Армопояс",budget:400000,paid:0,status:"todo",pct:0},"sten_pli");
   add({id:"lestn",group:"Коробка",name:"Лестницы",budget:300000,paid:0,status:"todo",pct:0},"sten_rab");
   add({id:"sten_mel",group:"Коробка",name:"Стены: мелочи",budget:250000,paid:0,status:"todo",pct:0},"lestn");
+  /* 02.09.2026: смета от Юли — новые суммы по полу, кладке, армопоясу,
+     лестницам и мелочам; «Сантехника + электрика» переезжает из «Коробки»
+     во «Внутреннюю»: это уже внутренние работы. */
+  set("pol1",{budget:1300000});
+  set("sten_rab",{name:"Стены: работа (кладка)",budget:2202000});
+  set("armo",{budget:516000});
+  set("lestn",{budget:120000});
+  set("sten_mel",{budget:751000});
+  set("inzh",{group:"Внутренняя"});
   return changed;
 }
 
