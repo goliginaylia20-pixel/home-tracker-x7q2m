@@ -450,6 +450,20 @@ function applyState(){
   });
   document.getElementById("stagesMeta").textContent=state.length+" позиций · "+mln(m.tb)+" ₽";
 }
+/* 02.09.2026, просьба Юли: статус «готово» = этап оплачен целиком.
+   Раньше статус и деньги жили отдельно, и «оплачено» не росло, хотя этапы
+   отмечены сделанными. Трогаем только позиции, где сумма не вписана руками
+   (paid===0) или проставлена этим же правилом (`autopaid`): частичные оплаты
+   вроде проекта 780 000 из 900 000 остаются как есть. Снятие «готово»
+   откатывает только то, что проставили автоматически. */
+function syncPaid(s){
+  if(s.status==="done"){
+    if((s.paid===0||s.autopaid)&&s.paid!==s.budget){s.paid=s.budget; s.autopaid=true; return true;}
+  }else if(s.autopaid){
+    s.paid=0; delete s.autopaid; return true;
+  }
+  return false;
+}
 function save(){store.set(KEY,JSON.stringify(state))}
 
 document.getElementById("groups").addEventListener("click",e=>{
@@ -468,6 +482,7 @@ document.getElementById("groups").addEventListener("click",e=>{
     s.pct=Math.min(100,Math.max(0,s.pct+(act==="plus"?5:-5)));
     s.status=s.pct===100?"done":s.pct===0?(s.status==="funded"?"funded":"todo"):"progress";
   }
+  syncPaid(s);
   applyState(); buildTimeline(); save();
 });
 document.getElementById("reset").addEventListener("click",()=>{
@@ -538,6 +553,8 @@ function migrate(){
   set("lestn",{budget:120000});
   set("sten_mel",{budget:751000});
   set("inzh",{group:"Внутренняя"});
+  // «готово» = оплачено: подтягиваем суммы у уже отмеченных этапов
+  state.forEach(s=>{ if(syncPaid(s)) changed=true; });
   return changed;
 }
 
