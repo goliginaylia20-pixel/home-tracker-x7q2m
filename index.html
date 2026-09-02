@@ -241,7 +241,7 @@ const SEED = [
   {id:"vyk",group:"Подготовка",name:"Выкорчёвка",budget:160000,paid:160000,status:"done",pct:100},
   {id:"sloy",group:"Подготовка",name:"Снять слой земли",budget:150000,paid:150000,status:"done",pct:100},
   {id:"pila",group:"Подготовка",name:"Пила",budget:20000,paid:20000,status:"done",pct:100},
-  {id:"proj",group:"Коробка",name:"Проект",budget:900000,paid:780000,status:"progress",pct:87},
+  {id:"proj",group:"Коробка",name:"Проект",budget:900000,paid:900000,status:"done",pct:100},
   {id:"diz",group:"Внутренняя",name:"Дизайн",budget:1050000,paid:150000,status:"progress",pct:14},
   {id:"svai",group:"Коробка",name:"Сваи",month:"июнь",budget:745000,paid:745000,status:"done",pct:100},
   {id:"rost",group:"Коробка",name:"Ростверк",month:"июнь",budget:2200000,paid:2200000,status:"progress",pct:50},
@@ -553,6 +553,8 @@ function migrate(){
   set("lestn",{budget:120000});
   set("sten_mel",{budget:751000});
   set("inzh",{group:"Внутренняя"});
+  // 02.09: проект оплачен полностью — Юля подтвердила
+  set("proj",{paid:900000});
   // «готово» = оплачено: подтягиваем суммы у уже отмеченных этапов
   state.forEach(s=>{ if(syncPaid(s)) changed=true; });
   return changed;
