@@ -418,12 +418,15 @@ function buildGroups(){
   }).join("");
 }
 
+let lastErr="";
 function applyState(){
+  lastErr="";
+  const part=(name,fn)=>{try{fn()}catch(e){lastErr=name+": "+(e&&e.message||e)}};
   const m=metrics();
   const r=41, c=2*Math.PI*r, ring=document.getElementById("ring");
   ring.style.strokeDasharray=c; ring.style.strokeDashoffset=c*(1-m.overall/100);
   document.getElementById("ringPct").textContent=m.overall+"%";
-  document.getElementById("navStatus").innerHTML='Фундамент · <b>'+m.overall+'%</b>';
+  part("nav",()=>{document.getElementById("navStatus").innerHTML='Фундамент · <b>'+m.overall+'%</b>';});
   // overview
   const set=(id,html)=>{const e=document.getElementById(id);if(e)e.innerHTML=html};
   set("ovDone",m.overall+'<small>%</small>');
@@ -432,10 +435,10 @@ function applyState(){
   set("ovPaidSub",Math.round(m.tp/m.tb*100)+'% бюджета');
   set("ovLeft",mln(m.tb-m.tp)+' <small>₽</small>');
   // rail
-  document.querySelectorAll("#rail .seg").forEach(seg=>{
-    const p=m.byG[seg.dataset.g].pct;
+  part("rail",()=>document.querySelectorAll("#rail .seg").forEach(seg=>{
+    const p=(m.byG[seg.dataset.g]||{}).pct||0;
     seg.querySelector("i").style.width=p+"%"; seg.querySelector(".pc").textContent=p+"%";
-  });
+  }));
   // donut
   const dc=2*Math.PI*58;
   document.querySelectorAll("#donut circle").forEach(ci=>{
@@ -449,7 +452,7 @@ function applyState(){
     const gi=document.querySelector(`[data-ghbar="${g}"]`); if(gi) gi.style.width=pc+"%";
   });
   // cards
-  state.forEach(s=>{
+  state.forEach(s=>{ try{
     const card=document.querySelector(`.card[data-id="${s.id}"]`); if(!card) return;
     const st=STATUS[s.status];
     card.querySelector(".cbar > i").style.width=s.pct+"%";
@@ -461,8 +464,8 @@ function applyState(){
     const paidTxt=(s.paid>0&&s.paid<s.budget)?`<span class="paid">${full(s.paid)} / </span>`
       :(s.paid>=s.budget&&s.budget>0)?`<span class="paid">оплачено · </span>`:"";
     card.querySelector(".bud").innerHTML=paidTxt+full(s.budget);
-  });
-  document.getElementById("stagesMeta").textContent=state.length+" позиций · "+mln(m.tb)+" ₽ · v19";
+  }catch(e){lastErr="карточка "+(s&&s.id)+": "+(e&&e.message||e)} });
+  document.getElementById("stagesMeta").textContent=state.length+" позиций · "+mln(m.tb)+" ₽ · v20"+(lastErr?" · сбой: "+lastErr:"");
 }
 /* 02.09.2026, просьба Юли: статус «готово» = этап оплачен целиком.
    Раньше статус и деньги жили отдельно, и «оплачено» не росло, хотя этапы
@@ -577,6 +580,27 @@ function migrate(){
 /* Рисуем СРАЗУ, до похода в хранилище: если облако тормозит или колбэк не пришёл,
    экран всё равно с цифрами, а не с прочерками. Когда данные приедут — перерисуем.
    Все builder'ы пишут через innerHTML, повторный вызов ничего не дублирует. */
+/* Сохранённые данные могли прийти из старой версии, обрезанного чанка или с чужим
+   форматом. Раньше одна битая позиция роняла отрисовку целиком, и Юля видела пустой
+   экран. Теперь приводим всё к нормальному виду по SEED и никогда не берём мусор. */
+function normalize(arr){
+  if(!Array.isArray(arr)) return null;
+  const out=[];
+  arr.forEach(raw=>{
+    if(!raw||typeof raw!=="object"||!raw.id) return;
+    const base=SEED.find(x=>x.id===raw.id)||{};
+    const it=Object.assign({},base,raw);
+    it.budget=Number(it.budget)||0;
+    it.paid=Number(it.paid)||0;
+    it.pct=Math.min(100,Math.max(0,Number(it.pct)||0));
+    if(!it.name) it.name=base.name||it.id;
+    if(GROUPS.indexOf(it.group)<0) it.group=base.group||"Коробка";
+    if(!STATUS[it.status]) it.status=it.pct===100?"done":it.pct>0?"progress":"todo";
+    if(!out.some(x=>x.id===it.id)) out.push(it);
+  });
+  SEED.forEach(s=>{ if(!out.some(x=>x.id===s.id)) out.push(Object.assign({},s)); });
+  return out.length?out:null;
+}
 function draw(){
   buildOverview();buildRail();buildDonut();buildTimeline();buildGroups();
   const paint=()=>{try{applyState()}catch(e){}};
@@ -588,7 +612,7 @@ async function init(){
   tgInit();
   draw();
   let r=null; try{r=await store.get(KEY)}catch(e){}
-  if(r&&r.value){try{state=JSON.parse(r.value)}catch(e){}}
+  if(r&&r.value){try{const n=normalize(JSON.parse(r.value)); if(n) state=n;}catch(e){}}
   try{if(migrate()) save()}catch(e){}
   draw();
 }
