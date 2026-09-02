@@ -288,20 +288,34 @@ const TG=window.Telegram&&window.Telegram.WebApp;
    частями по 1300 символов в ключи <KEY>_0..N плюс счётчик <KEY>_n. */
 const CHUNK=1300;
 const cloud=TG&&TG.CloudStorage&&TG.CloudStorage.getItem?TG.CloudStorage:null;
-const cget=k=>new Promise(res=>{try{cloud.getItem(k,(e,v)=>res(e?null:v))}catch(_){res(null)}});
+/* Telegram CloudStorage иногда не вызывает колбэк ВООБЩЕ — не ошибка, а тишина.
+   Тогда промис висит вечно, загрузка не доходит ни до localStorage, ни до отрисовки,
+   и Юля видит пустой апп с прочерками. Поэтому таймаут на каждый вызов облака. */
+const CS_TIMEOUT=3500;
+const once=(fn,fallback)=>new Promise(res=>{
+  let done=false; const fin=v=>{if(!done){done=true;res(v)}};
+  setTimeout(()=>fin(fallback),CS_TIMEOUT);
+  try{fn(fin)}catch(_){fin(fallback)}
+});
+const cget=k=>once(fin=>cloud.getItem(k,(e,v)=>fin(e?null:v)),null);
 let queue=Promise.resolve();
-const cset=(k,v)=>new Promise(res=>{try{cloud.setItem(k,v,(e)=>res(!e))}catch(_){res(false)}});
+const cset=(k,v)=>once(fin=>cloud.setItem(k,v,(e)=>fin(!e)),false);
 const store={
   async get(k){
-    // 1) Telegram CloudStorage — синхронизируется между устройствами
+    // 1) Telegram CloudStorage — синхронизируется между устройствами.
+    //    Общий дедлайн на всё чтение: даже если облако молчит на каждом ключе,
+    //    апп ждёт не больше CS_TIMEOUT и уходит в localStorage, а не висит с прочерками.
     if(cloud){
-      const n=parseInt(await cget(k+"_n"),10);
-      if(n>0){
-        const parts=await Promise.all(Array.from({length:n},(_,i)=>cget(k+"_"+i)));
-        if(parts.every(p=>p!==null&&p!==undefined&&p!=="")) return {value:parts.join("")};
-      }
-      const legacy=await cget(k); // версии до чанкования
-      if(legacy) return {value:legacy};
+      const cloudRead=(async()=>{
+        const n=parseInt(await cget(k+"_n"),10);
+        if(n>0){
+          const parts=await Promise.all(Array.from({length:n},(_,i)=>cget(k+"_"+i)));
+          if(parts.every(p=>p!==null&&p!==undefined&&p!=="")) return parts.join("");
+        }
+        return await cget(k); // версии до чанкования
+      })();
+      const v=await Promise.race([cloudRead,new Promise(r=>setTimeout(()=>r(null),CS_TIMEOUT))]);
+      if(v) return {value:v};
     }
     // 2) запасной вариант — локально в браузере
     try{const v=localStorage.getItem(k); return v?{value:v}:null}catch(e){return null}
